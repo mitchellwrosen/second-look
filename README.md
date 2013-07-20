@@ -9,12 +9,9 @@ which you should definitely go check out.
 
 Status/TODOs
 ------------
-* send email to \username
+* ~~send email to \username~~
 * send email to user@domain
 * send multiple emails, one per matched pattern
-
-But when it's done...
----------------------
 
 Setup
 -----
