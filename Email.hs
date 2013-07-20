@@ -38,11 +38,11 @@ getSes = do
 sendErrorEmail :: TL.Text    -- | The text to include in the error email.
                -> IO ()
 sendErrorEmail message =
-    simpleMail from to subject plainBody htmlBody attachments >>=
+    simpleMail to from subject plainBody htmlBody attachments >>=
     sendEmail
   where
-    from        = Address (Just "SecondLook")     "mitchellwrosen@gmail.com"
     to          = Address (Just "Mitchell Rosen") "mitchellwrosen@gmail.com"
+    from        = Address (Just "SecondLook")     "mitchellwrosen@gmail.com"
     subject     = "SecondLook error"
     plainBody   = message
     htmlBody    = message

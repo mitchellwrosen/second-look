@@ -16,6 +16,7 @@ import Data.Aeson (eitherDecode)
 import Github.Users (detailedOwnerEmail, userInfoFor)
 import Network.Mail.Mime (Address(..), simpleMail)
 import System.Directory (getPermissions, readable)
+import System.Environment (getArgs)
 import Text.Hastache (MuType(..), defaultConfig, hastacheFile)
 import Text.Hastache.Context (mkStrContext)
 import Text.Regex.PCRE ((=~))
@@ -104,7 +105,7 @@ sendSecondLookEmail repo commit = do
     doSendEmail username user_email =
         bsl2tl <$> readTemplate "templates/plain.mustache" >>= \plain_body ->
         bsl2tl <$> readTemplate "templates/html.mustache"  >>= \html_body ->
-        simpleMail from to subject plain_body html_body attachments >>=
+        simpleMail to from subject plain_body html_body attachments >>=
         sendEmail
       where
         readTemplate :: String -> IO BSL.ByteString
@@ -120,8 +121,8 @@ sendSecondLookEmail repo commit = do
         context "repo_name"        = MuVariable $ repo   ^. prName
         context "username"         = MuVariable $ username
 
-        from        = Address (Just "SecondLook") "mitchellwrosen@gmail.com"
         to          = Address Nothing             user_email
+        from        = Address (Just "SecondLook") "mitchellwrosen@gmail.com"
         subject     = username `T.append` " is requesting code review via Second Look"
         attachments = []
 
@@ -144,5 +145,11 @@ sanityChecks = do
 
 -- | The main entry point of the program. Performs sanity checks to make sure
 -- various environment variables and files exist, then launches the web server.
+-- Run with single argument "--debug" to bind to port 8080.
 main :: IO ()
-main = sanityChecks >> warp 8080 SecondLook
+main =
+    sanityChecks >>
+    getArgs >>=
+    \case
+        ("--debug":_) -> warp 8080 SecondLook
+        _             -> warp 80 SecondLook
