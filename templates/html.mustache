@@ -1,0 +1,22 @@
+<h2>Hi, {{username}}!</h2>
+
+<p><strong>{{commit_author}}</strong> wants you to review a recent commit to <a
+href="{{repo_url}}">{{repo_name}}</a> on GitHub.</p>
+
+<p>Review it: <a href="{{commit_url}}">{{commit_url}}</a></p>
+
+<h3>Commit Details</h3>
+<table>
+   <tr>
+      <th style="text-align:right">Hash: </th>
+      <td>{{commit_id}}</td>
+   </tr>
+   <tr>
+      <th style="text-align:right">Committed: </th>
+      <td>{{commit_timestamp}}</td>
+   <tr>
+      <th style="text-align:right">Message: </th>
+      <td>{{commit_message}}</td>
+   </tr>
+<hr>
+<p style="font-size:10px;color:#ccc;font-style:italic">Sent by <a href="https://www.github.com/mitchellwrosen/second-look">Second Look</p>

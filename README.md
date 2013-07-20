@@ -2,7 +2,11 @@ Second Look
 ===========
 
 Second Look is an endpoint for a GitHub post-receive hook. It will send an email
-to one or more developers based on the contents of the new commits.
+to one or more developers based on the contents of the new commits, requesting
+code review.
+
+I stole this idea from [reviewthis](https://github.com/supermatter/reviewthis),
+which you should definitely check out.
 
 Status
 ------
