@@ -1,0 +1,8 @@
+*.hi
+*.o
+.redo/
+
+client_session_key.aes
+
+SecondLook
+run.sh
