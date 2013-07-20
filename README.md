@@ -27,3 +27,15 @@ notified by email to review your commit.
 Example:
 
 > $ git commit -m "Buncha hacks. Make sure I don't bomb the Russians, @chebert"
+
+Issues
+------
+GitHub may change the format of the [POST
+payload](https://help.github.com/articles/post-receive-hooks#the-payload) (in
+fact, it's currently out of date!). This server would be more "reliable" if it
+were written in a dynamically typed language that simply tries to access the
+"commits.messages" field (which is probably not going to change). Each to his
+own, and I personally would rather leverage static typing, and so each time the
+POST payload format changes, the server breaks. Rest assured, though, that these
+occurrences should be few and far between, and I will promptly fix them when
+they do occur.
