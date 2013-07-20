@@ -93,8 +93,8 @@ sendSecondLookEmail :: PayloadRepository  -- | The repository pushed to.
                     -> PayloadCommit      -- | One commit of the push.
                     -> IO ()
 sendSecondLookEmail repo commit = do
-    let github_username = bs2ts $ BS.drop 1 $ -- Drop the '@'
-            (commit ^. pcMessage) =~ ("@\\w+" :: BS.ByteString)
+    let github_username = bs2ts $ BS.drop 1 $ -- Drop the '\'
+            (commit ^. pcMessage) =~ ("\\\\\\w+" :: BS.ByteString)
     unless (T.null github_username) $
         userInfoFor (T.unpack github_username) >>=
         either (const $ return ())
