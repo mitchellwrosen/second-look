@@ -7,29 +7,42 @@ import Control.Applicative ((<$>))
 import Control.Exception (catch)
 import Control.Monad.Trans (liftIO)
 import Network.HTTP.Conduit (HttpException(..), withManager)
-import Network.Mail.Mime (Address(..), Mail, simpleMail)
+import Network.Mail.Mime (Address(..), Mail, mailBcc, mailCc, mailTo, simpleMail)
 import Network.Mail.Mime.SES (SES(..), renderSendMailSES)
 import System.Environment (getEnv)
 
 import qualified Data.ByteString.Char8 as BS
 import qualified Data.Text.Lazy        as TL
 
+import Text.Extras (ts2bs)
+
 sendEmail :: Mail -> IO ()
-sendEmail mail = 
+sendEmail mail =
     catch (withManager $ \manager -> do
-              ses <- liftIO getSes
+              let recipients = extractRecipientsFromMail mail
+              ses <- liftIO $ getSes recipients
               renderSendMailSES manager ses mail)
           (\(ex :: HttpException) -> do
               sendErrorEmail $ TL.pack $ show ex)
 
+extractRecipientsFromMail :: Mail -> [BS.ByteString]
+extractRecipientsFromMail mail =
+    concatMap extractRecipientsFromAddresses [ mailTo  mail
+                                             , mailCc  mail
+                                             , mailBcc mail
+                                             ]
+
+extractRecipientsFromAddresses :: [Address] -> [BS.ByteString]
+extractRecipientsFromAddresses = map (ts2bs . addressEmail)
+
 -- Unchecked getEnv errors, but they are called first in main.
-getSes :: IO SES
-getSes = do
+getSes :: [BS.ByteString] -> IO SES
+getSes recipients = do
     access_key <- BS.pack <$> getEnv "SECOND_LOOK_ACCESS_KEY"
     secret_key <- BS.pack <$> getEnv "SECOND_LOOK_SECRET_KEY"
     return $ SES
         { sesFrom      = "mitchellwrosen@gmail.com"
-        , sesTo        = ["mitchellwrosen@gmail.com"]
+        , sesTo        = recipients
         , sesAccessKey = access_key
         , sesSecretKey = secret_key
         }

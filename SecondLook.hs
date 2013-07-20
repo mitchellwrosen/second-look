@@ -13,7 +13,7 @@ import System.Environment (getEnv)
 import Control.Monad.Trans (liftIO)
 import Control.Lens ((^.))
 import Data.Aeson (eitherDecode)
-import Github.Users (detailedOwnerEmail, userInfoFor)
+import Github.Users (detailedOwnerEmail, detailedOwnerName, userInfoFor)
 import Network.Mail.Mime (Address(..), simpleMail)
 import System.Directory (getPermissions, readable)
 import System.Environment (getArgs)
@@ -93,16 +93,18 @@ sendSecondLookEmail :: PayloadRepository  -- | The repository pushed to.
                     -> PayloadCommit      -- | One commit of the push.
                     -> IO ()
 sendSecondLookEmail repo commit = do
-    let username = bs2ts $ BS.drop 1 $ -- Drop the '@'
+    let github_username = bs2ts $ BS.drop 1 $ -- Drop the '@'
             (commit ^. pcMessage) =~ ("@\\w+" :: BS.ByteString)
-    unless (T.null username) $
-        userInfoFor (T.unpack username) >>=
+    unless (T.null github_username) $
+        userInfoFor (T.unpack github_username) >>=
         either (const $ return ())
-               (\user_info ->
-                   doSendEmail username (T.pack $ detailedOwnerEmail user_info))
+               (\github_user_info ->
+                   doSendEmail github_username
+                               (T.pack <$> detailedOwnerName  github_user_info)
+                               (T.pack  $  detailedOwnerEmail github_user_info))
   where
-    doSendEmail :: T.Text -> T.Text -> IO ()
-    doSendEmail username user_email =
+    doSendEmail :: T.Text -> Maybe T.Text -> T.Text -> IO ()
+    doSendEmail github_username recipient_full_name recipient_email =
         bsl2tl <$> readTemplate "templates/plain.mustache" >>= \plain_body ->
         bsl2tl <$> readTemplate "templates/html.mustache"  >>= \html_body ->
         simpleMail to from subject plain_body html_body attachments >>=
@@ -112,18 +114,21 @@ sendSecondLookEmail repo commit = do
         readTemplate file_path = hastacheFile defaultConfig
                                               file_path
                                               (mkStrContext context)
-        context "commit_author"    = MuVariable $ commit ^. pcAuthor ^. puName
+
+        commit_author = commit ^. pcAuthor ^. puName
+
+        context "commit_author"    = MuVariable $ commit_author
         context "commit_id"        = MuVariable $ commit ^. pcId
         context "commit_message"   = MuVariable $ commit ^. pcMessage
         context "commit_timestamp" = MuVariable $ commit ^. pcTimestamp
         context "commit_url"       = MuVariable $ commit ^. pcUrl
         context "repo_url"         = MuVariable $ repo   ^. prUrl
         context "repo_name"        = MuVariable $ repo   ^. prName
-        context "username"         = MuVariable $ username
+        context "username"         = MuVariable $ github_username
 
-        to          = Address Nothing             user_email
-        from        = Address (Just "SecondLook") "mitchellwrosen@gmail.com"
-        subject     = username `T.append` " is requesting code review via Second Look"
+        to          = Address recipient_full_name recipient_email
+        from        = Address (Just "Second Look") "mitchellwrosen@gmail.com"
+        subject     = commit_author `T.append` " is requesting code review via Second Look"
         attachments = []
 
 -- | Perform simple sanity checks to make sure the server will run properly.
