@@ -14,60 +14,60 @@ import Data.ByteString (ByteString)
 import Data.Text (Text)
 
 data PayloadUser = PayloadUser
-    { _puName     :: Text
-    , _puEmail    :: Maybe Text
-    , _puUsername :: Maybe Text
+    { _userName     :: Text
+    , _userEmail    :: Maybe Text
+    , _userUsername :: Maybe Text
     } deriving (Show)
 makeLenses ''PayloadUser
 
 data PayloadCommit = PayloadCommit
-    { _pcAdded     :: [Text]
-    , _pcAuthor    :: PayloadUser
-    , _pcCommitter :: PayloadUser
-    , _pcDistinct  :: Bool
-    , _pcId        :: Text
-    , _pcMessage   :: ByteString -- Not Text, because ByteString is RegexLike
-    , _pcModified  :: [Text]
-    , _pcRemoved   :: [Text]
-    , _pcTimestamp :: Text
-    , _pcUrl       :: Text
+    { _commitAdded     :: [Text]
+    , _commitAuthor    :: PayloadUser
+    , _commitCommitter :: PayloadUser
+    , _commitDistinct  :: Bool
+    , _commitId        :: Text
+    , _commitMessage   :: ByteString -- Not Text, because ByteString is RegexLike
+    , _commitModified  :: [Text]
+    , _commitRemoved   :: [Text]
+    , _commitTimestamp :: Text
+    , _commitUrl       :: Text
     } deriving (Show)
 makeLenses ''PayloadCommit
 
 data PayloadRepository = PayloadRepository
-    { _prCreatedAt    :: Integer
-    , _prDescription  :: Text
-    , _prFork         :: Bool
-    , _prForks        :: Integer
-    , _prHasDownloads :: Bool
-    , _prHasIssues    :: Bool
-    , _prHasWiki      :: Bool
-    , _prId           :: Integer
-    , _prMasterBranch :: Text
-    , _prName         :: Text
-    , _prOpenIssues   :: Integer
-    , _prOwner        :: PayloadUser
-    , _prPrivate      :: Bool
-    , _prPushedAt     :: Integer
-    , _prSize         :: Integer
-    , _prStargazers   :: Integer
-    , _prUrl          :: Text
-    , _prWatchers     :: Integer
+    { _repoCreatedAt    :: Integer
+    , _repoDescription  :: Text
+    , _repoFork         :: Bool
+    , _repoForks        :: Integer
+    , _repoHasDownloads :: Bool
+    , _repoHasIssues    :: Bool
+    , _repoHasWiki      :: Bool
+    , _repoId           :: Integer
+    , _repoMasterBranch :: Text
+    , _repoName         :: Text
+    , _repoOpenIssues   :: Integer
+    , _repoOwner        :: PayloadUser
+    , _repoPrivate      :: Bool
+    , _repoPushedAt     :: Integer
+    , _repoSize         :: Integer
+    , _repoStargazers   :: Integer
+    , _repoUrl          :: Text
+    , _repoWatchers     :: Integer
     } deriving (Show)
 makeLenses ''PayloadRepository
 
 data Payload = Payload
-    { _pAfter      :: Text
-    , _pBefore     :: Text
-    , _pCommits    :: [PayloadCommit]
-    , _pCompare    :: Text
-    , _pCreated    :: Bool
-    , _pDeleted    :: Bool
-    , _pForced     :: Bool
-    , _pHeadCommit :: PayloadCommit
-    , _pPusher     :: PayloadUser
-    , _pRef        :: Text
-    , _pRepository :: PayloadRepository
+    { _payloadAfter      :: Text
+    , _payloadBefore     :: Text
+    , _payloadCommits    :: [PayloadCommit]
+    , _payloadCompare    :: Text
+    , _payloadCreated    :: Bool
+    , _payloadDeleted    :: Bool
+    , _payloadForced     :: Bool
+    , _payloadHeadCommit :: PayloadCommit
+    , _payloadPusher     :: PayloadUser
+    , _payloadRef        :: Text
+    , _payloadRepository :: PayloadRepository
     } deriving (Show)
 makeLenses ''Payload
 

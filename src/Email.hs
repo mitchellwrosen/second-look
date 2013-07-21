@@ -1,5 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE StandaloneDeriving #-}
 
 module Email where
 
@@ -14,16 +15,19 @@ import System.Environment (getEnv)
 import qualified Data.ByteString.Char8 as BS
 import qualified Data.Text.Lazy        as TL
 
-import Text.Extras (ts2bs)
+import Data.Text.Encoding.Extras (t2bs)
+
+instance Show Mail
+instance Show SES
 
 sendEmail :: Mail -> IO ()
-sendEmail mail =
+sendEmail mail = do
     catch (withManager $ \manager -> do
               let recipients = extractRecipientsFromMail mail
               ses <- liftIO $ getSes recipients
               renderSendMailSES manager ses mail)
           (\(ex :: HttpException) -> do
-              sendErrorEmail $ TL.pack $ show ex)
+              sendErrorEmail [ "HttpException", TL.pack $ show ex])
 
 extractRecipientsFromMail :: Mail -> [BS.ByteString]
 extractRecipientsFromMail mail =
@@ -33,12 +37,11 @@ extractRecipientsFromMail mail =
                                              ]
 
 extractRecipientsFromAddresses :: [Address] -> [BS.ByteString]
-extractRecipientsFromAddresses = map (ts2bs . addressEmail)
+extractRecipientsFromAddresses = map (t2bs . addressEmail)
 
--- Unchecked getEnv errors, but they are called first in main.
 getSes :: [BS.ByteString] -> IO SES
 getSes recipients = do
-    access_key <- BS.pack <$> getEnv "SECOND_LOOK_ACCESS_KEY"
+    access_key <- BS.pack <$> getEnv "SECOND_LOOK_ACCESS_KEY" -- Uncaught errors, but they are called first in main.
     secret_key <- BS.pack <$> getEnv "SECOND_LOOK_SECRET_KEY"
     return $ SES
         { sesFrom      = "mitchellwrosen@gmail.com"
@@ -47,16 +50,14 @@ getSes recipients = do
         , sesSecretKey = secret_key
         }
 
--- | Sends a "debug me now" email to myself.
-sendErrorEmail :: TL.Text  -- | The text to include in the error email.
-               -> IO ()
+sendErrorEmail :: [TL.Text] -> IO ()
 sendErrorEmail message =
     simpleMail to from subject plainBody htmlBody attachments >>=
     sendEmail
   where
     to          = Address (Just "Mitchell Rosen") "mitchellwrosen@gmail.com"
-    from        = Address (Just "SecondLook")     "mitchellwrosen@gmail.com"
-    subject     = "SecondLook error"
-    plainBody   = message
-    htmlBody    = message
+    from        = Address (Just "Second Look")    "mitchellwrosen@gmail.com"
+    subject     = "Second Look error"
+    plainBody   = TL.unlines message
+    htmlBody    = TL.unlines message
     attachments = []
