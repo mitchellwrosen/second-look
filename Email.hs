@@ -48,7 +48,7 @@ getSes recipients = do
         }
 
 -- | Sends a "debug me now" email to myself.
-sendErrorEmail :: TL.Text    -- | The text to include in the error email.
+sendErrorEmail :: TL.Text  -- | The text to include in the error email.
                -> IO ()
 sendErrorEmail message =
     simpleMail to from subject plainBody htmlBody attachments >>=
