@@ -5,27 +5,25 @@
 {-# LANGUAGE TemplateHaskell    #-}
 {-# LANGUAGE TypeFamilies       #-}
 
-module Main where
+module SecondLook where
 
 import Control.Applicative ((<$>))
-import Control.Monad (unless)
-import System.Environment (getEnv)
-
+import Control.Monad (forM_, unless)
 import Control.Monad.Trans (liftIO)
-import Control.Lens ((^.))
+import Control.Lens ((^.), _1, mapped, over)
 import Data.Aeson (eitherDecode)
+import Data.Array (elems)
 import Data.Data (Data)
 import Data.Generics (Typeable)
 import Github.Users (DetailedOwner, detailedOwnerEmail, detailedOwnerName, userInfoFor)
 import Network.Mail.Mime (Address(..), Mail, simpleMail)
-import System.Directory (getPermissions, readable)
-import System.Environment (getArgs)
 import Text.Hastache (defaultConfig, hastacheFile)
-import Text.Hastache.Context (mkGenericContext)
-import Text.Regex.PCRE ((=~))
+import Text.Hastache.Context (mkStrContext, mkGenericContext)
+import Text.Regex.PCRE (MatchText, Regex, (=~), makeRegex)
+import Text.Regex.Base.Extras (matchAllTextOnly)
 import Yesod.Core (Yesod)
 import Yesod.Core.Content (TypedContent)
-import Yesod.Core.Dispatch (mkYesod, parseRoutes, warp)
+import Yesod.Core.Dispatch (mkYesod, parseRoutes)
 import Yesod.Core.Handler (getRequest, invalidArgs, lookupPostParam, respond)
 import Yesod.Routes.Class (renderRoute)
 
@@ -35,7 +33,9 @@ import qualified Data.Text.Lazy        as TL
 
 import Email (sendEmail, sendErrorEmail)
 import GithubPayload
-import Text.Extras (bsl2tl, tl2bsl, ts2tl)
+import Data.Text.Encoding.Extras (bs2t, bsl2tl, t2bsl, t2tl)
+
+import Data.Text.Encoding (decodeUtf8)
 
 data SecondLook = SecondLook
 
@@ -45,26 +45,13 @@ mkYesod "SecondLook" [parseRoutes|
 
 instance Yesod SecondLook
 
--- | Handler for POSTs to /. Sends Second Look emails if commits so request
--- them.
-postRootR :: Handler TypedContent
-postRootR =
-    -- TODO: Send (show request) in error email.
-    -- Need to make YesodRequest an instance of Show.
-    getRequest >>= \_ ->
-    lookupPostParam "payload" >>=
-    \case
-        Just push -> handlePayload push >>
-                    respond "text/plain" ("ok" :: T.Text)
-        Nothing   -> liftIO (sendErrorEmail "Bad Request") >>
-                    invalidArgs ["Expected parameter 'payload'"]
-
---------------------------------------------------------------------------------
-
+-- All of the information picked out of a payload and put into an email.
+-- CHANGES HERE MUST BE REFLECTED IN templates/!!! There is no compile-time assurance that the {{selectors}} are
+-- matching anything.
 data SecondLookEmail = SecondLookEmail
     { sleCommitAuthor    :: !T.Text
     , sleCommitId        :: !T.Text
-    , sleCommitMessage   :: !BS.ByteString
+    , sleCommitMessage   :: !BS.ByteString -- ByteString because it's RegexLike and Text isn't.
     , sleCommitTimestamp :: !T.Text
     , sleCommitUrl       :: !T.Text
     , sleRepoUrl         :: !T.Text
@@ -72,146 +59,103 @@ data SecondLookEmail = SecondLookEmail
     , sleUsername        :: !T.Text
     } deriving (Data, Typeable)
 
--- | Regex for \username
-githubUsernameRegex :: BS.ByteString
-githubUsernameRegex = "\\\\\\w+"
+-- \username
+githubUsernameRegex :: Regex
+githubUsernameRegex = makeRegex ("\\\\\\w+" :: BS.ByteString)
 
--- | Regex for \user@domain.com
-emailHandleRegex :: BS.ByteString
-emailHandleRegex = "\\\\\\b[\\w\\d.%+-]+@[\\w\\d.-]+\\.[a-zA-Z]{2,4}+\\b"
+-- \user@domain.com
+emailHandleRegex :: Regex
+emailHandleRegex = makeRegex ("\\\\\\b[\\w\\d.%+-]+@[\\w\\d.-]+\\.[a-zA-Z]{2,4}+\\b" :: BS.ByteString)
 
--- | handlePayload @push@ handles @push@ as if it were from GitHub, per the
--- specification in https://help.github.com/articles/post-receive-hooks#the-payload
-handlePayload :: T.Text ->  -- | The POSTed data.
-                Handler ()
-handlePayload push =
-    liftIO (putStrLn $ T.unpack push) >>
-    decodePayload push >>=
+postRootR :: Handler TypedContent
+postRootR =
+    getRequest >>= \_ -> -- TODO: Send (show request) in error email.
+    lookupPostParam "payload" >>=
+    \case
+        Just push ->
+            handlePayload push >>
+            respond "text/plain" ("ok" :: T.Text)
+        Nothing ->
+            liftIO (sendErrorEmail ["Bad Request"]) >>
+            invalidArgs ["Expected parameter 'payload'"]
+
+handlePayload :: T.Text -> Handler ()
+handlePayload push_json =
+    decodePayload >>=
     liftIO . sendSecondLookEmails
+  where
+    decodePayload :: Handler Payload
+    decodePayload =
+        case eitherDecode (t2bsl push_json) of
+            Right payload -> return payload
+            Left  err     ->
+                liftIO (sendErrorEmail [TL.pack err, t2tl push_json]) >>
+                invalidArgs [push_json]
 
--- | decodePayload @push@ attempts to decode @push@ into a 'Payload'. If
--- unsuccessful, fires off an email to myself and returns a 400 invalid
--- arguments page.
-decodePayload :: T.Text ->         -- The payload to decode.
-                Handler Payload  -- The decoded payload.
-decodePayload push =
-    case eitherDecode (tl2bsl push) of
-        Right payload -> return payload
-        Left  err     -> do
-            liftIO $ sendErrorEmail $ TL.unlines [ TL.pack err, (ts2tl push) ]
-            invalidArgs [ "Invalid payload"
-                        , "Aeson parse error: " `T.append` T.pack err
-                        ]
-
--- | Sends Second Look emails (if necessary) with the commits in @payload@.
-sendSecondLookEmails :: Payload  -- | The received payload (a single push).
-                     -> IO ()
+sendSecondLookEmails :: Payload -> IO ()
 sendSecondLookEmails payload = do
-    mapM_ (sendSecondLookEmail $ payload ^. pRepository) $ payload ^. pCommits
+    let repo    = payload ^. payloadRepository
+        commits = payload ^. payloadCommits
+    mapM_ (sendSecondLookEmail repo) commits
 
--- | sendSecondLookEmail @repo@ @commit@ sends a Second Look email if @commit@
--- contains the string "@username". Uses fields in @repo@ and @commit@ to
--- populate the email message.
-sendSecondLookEmail :: PayloadRepository  -- | The repository pushed to.
-                    -> PayloadCommit      -- | One commit of the push.
-                    -> IO ()
-sendSecondLookEmail repo commit = do
-    maybeSendEmailToGitHubUsername
+sendSecondLookEmail :: PayloadRepository -> PayloadCommit   -> IO ()
+sendSecondLookEmail repo commit =
+    maybeSendEmailToGitHubUsername >>
     maybeSendEmailToEmailHandle
   where
-    maybeSendEmailToEmailHandle = undefined
-
-    -- | Searches the commit message for \username. If found, and the username
-    -- is valid, sends an email. Otherwise, does nothing.
     maybeSendEmailToGitHubUsername :: IO ()
     maybeSendEmailToGitHubUsername =
         let
-            commit_message  = commit ^. pcMessage
-            github_username = BS.unpack (commit_message =~ githubUsernameRegex :: BS.ByteString)
+            commit_message   = commit ^. commitMessage
+            github_usernames = T.drop 1 . bs2t <$> matchAllTextOnly githubUsernameRegex commit_message
         in
-            userInfoFor github_username >>=
-            either (const $ return ())
-                   (sendEmailToGitHubUser github_username)
+            forM_ github_usernames $ \github_username ->
+                userInfoFor (T.unpack github_username) >>=
+                \case
+                    Right github_user_info -> sendEmailToGitHubUser github_username github_user_info
+                    Left _ -> return () -- Matched \junk, just ignore
 
-    -- | Sends an email to a GitHub user given @github_username@ and
-    -- @github_user_info@.
-    sendEmailToGitHubUser :: String -> DetailedOwner -> IO ()
+    sendEmailToGitHubUser :: T.Text -> DetailedOwner -> IO ()
     sendEmailToGitHubUser github_username github_user_info = do
-        let full_name  = detailedOwnerName  github_user_info
-            email_addr = detailedOwnerEmail github_user_info
-        doSendEmail (T.pack     github_username)
-                    (T.pack <$> full_name)
-                    (T.pack email_addr)
+        let full_name  = T.pack <$> detailedOwnerName  github_user_info
+            email_addr = T.pack  $  detailedOwnerEmail github_user_info
+        doSendEmail github_username full_name email_addr
 
-    -- | Sends an email to a user, addressing him or her by username, but also
-    -- includes their full name if available.
-    doSendEmail :: T.Text       ->  -- | The username of the recipient.
-                  Maybe T.Text ->  -- | The full name of the recipient.
-                  T.Text       ->  -- | The email address of the recipient.
-                  IO ()
-    doSendEmail recipient_username recipient_full_name recipient_email = do
+    maybeSendEmailToEmailHandle :: IO ()
+    maybeSendEmailToEmailHandle = do
+        let commit_message = commit ^. commitMessage
+            email_addrs    = T.drop 1 . bs2t <$> matchAllTextOnly emailHandleRegex commit_message
+        forM_ email_addrs $ \email_addr ->
+            doSendEmail email_addr (Just email_addr) email_addr
+
+    doSendEmail :: T.Text -> Maybe T.Text -> T.Text -> IO ()
+    doSendEmail recipient_handle recipient_full_name recipient_email = do
         plain_body <- readTemplate "templates/plain.mustache" second_look_email
-        html_body  <- readTemplate "templates/html.mustache"  second_look_email
+        html_body  <- readTemplate "templates/html.mustache" second_look_email
         createEmail plain_body html_body >>= sendEmail
       where
-        commit_author = commit ^. pcAuthor ^. puName
+        commit_author = commit ^. commitAuthor ^. userName
+
         second_look_email = SecondLookEmail
             { sleCommitAuthor    = commit_author
-            , sleCommitId        = commit ^. pcId
-            , sleCommitMessage   = commit ^. pcMessage
-            , sleCommitTimestamp = commit ^. pcTimestamp
-            , sleCommitUrl       = commit ^. pcUrl
-            , sleRepoUrl         = repo   ^. prUrl
-            , sleRepoName        = repo   ^. prName
-            , sleUsername        = recipient_username
+            , sleCommitId        = commit ^. commitId
+            , sleCommitMessage   = commit ^. commitMessage
+            , sleCommitTimestamp = commit ^. commitTimestamp
+            , sleCommitUrl       = commit ^. commitUrl
+            , sleRepoUrl         = repo   ^. repoUrl
+            , sleRepoName        = repo   ^. repoName
+            , sleUsername        = recipient_handle
             }
 
-        createEmail :: TL.Text ->  -- | Plain body.
-                      TL.Text ->  -- | HTML body.
-                      IO Mail
+        createEmail :: TL.Text -> TL.Text -> IO Mail
         createEmail plain_body html_body =
             simpleMail to from subject plain_body html_body attachments
 
         to          = Address recipient_full_name recipient_email
         from        = Address (Just "Second Look") "mitchellwrosen@gmail.com"
-        subject     = commit_author `T.append` " is requesting code review via Second Look"
+        subject     = commit_author `T.append` " is requesting code review"
         attachments = []
 
 readTemplate :: String -> SecondLookEmail -> IO TL.Text
 readTemplate file_path context = bsl2tl <$>
     hastacheFile defaultConfig file_path (mkGenericContext context)
-
--- | Perform simple sanity checks to make sure the server will run properly.
--- This basically just calls functions that will error.
-sanityChecks :: IO ()
-sanityChecks = do
-    sanityCheckEnvironmentVariables
-    sanityCheckEmailTemplates
-  where
-    sanityCheckEnvironmentVariables :: IO ()
-    sanityCheckEnvironmentVariables = do
-        access_key <- getEnv "SECOND_LOOK_ACCESS_KEY"
-        secret_key <- getEnv "SECOND_LOOK_SECRET_KEY"
-        putStrLn $ "Access key = " ++ access_key
-        putStrLn $ "Secret key = " ++ secret_key
-
-    sanityCheckEmailTemplates :: IO ()
-    sanityCheckEmailTemplates = do
-        errorIfCannotRead "templates/plain.mustache"
-        errorIfCannotRead "templates/html.mustache"
-
-    errorIfCannotRead :: FilePath -> IO ()
-    errorIfCannotRead file_path = do
-        plain_perms <- getPermissions file_path
-        unless (readable plain_perms) $ error (file_path ++ " unreadable")
-
--- | The main entry point of the program. Performs sanity checks to make sure
--- various environment variables and files exist, then launches the web server.
--- Run with single argument "--debug" to bind to port 8080.
-main :: IO ()
-main =
-    sanityChecks >>
-    getArgs >>=
-    \case
-        ("--debug":_) -> warp 8080 SecondLook
-        _             -> warp 80 SecondLook

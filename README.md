@@ -10,7 +10,7 @@ which you should definitely go check out.
 Status/TODOs
 ------------
 * ~~send email to \username~~
-* send email to user@domain
+* send email to \user@domain
 * send multiple emails, one per matched pattern
 
 Setup
@@ -27,6 +27,8 @@ GitHub username. That person will be notified by email to review your commit.
 Example:
 
 > $ git commit -m "Buncha hacks. Make sure I don't bomb the Russians, \chebert"
+> ... work work work ...
+> $ git commit -m "more hax \chebert \steve@helpme.com"
 
 \username? What gives? Why not @username? Everybody's doin' it.
 ---------------------------------------------------------------

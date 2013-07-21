@@ -23,7 +23,7 @@
    },
    {
       "command" : "redo",
-      "args"    : ["src/SecondLook"],
-      "output"  : "Building SecondLook..."
+      "args"    : ["src/Main"],
+      "output"  : "Building Main..."
    }
 ]
