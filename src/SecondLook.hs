@@ -58,11 +58,11 @@ data SecondLookEmail = SecondLookEmail
 
 -- \username
 githubUsernameRegex :: Regex
-githubUsernameRegex = makeRegex ("\\b\\\\\\w+\\b" :: BS.ByteString)
+githubUsernameRegex = makeRegex ("\\\\\\w+" :: BS.ByteString)
 
 -- \user@domain.com
 emailHandleRegex :: Regex
-emailHandleRegex = makeRegex ("\\\\\\b[\\w\\d.%+-]+@[\\w\\d.-]+\\.[a-zA-Z]{2,4}+\\b" :: BS.ByteString)
+emailHandleRegex = makeRegex ("\\\\[\\w\\d.%+-]+@[\\w\\d.-]+\\.[a-zA-Z]{2,4}+" :: BS.ByteString)
 
 postRootR :: Handler TypedContent
 postRootR =
