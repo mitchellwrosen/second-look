@@ -8,18 +8,17 @@
 module SecondLook where
 
 import Control.Applicative ((<$>))
-import Control.Monad (forM_, unless)
+import Control.Monad (forM_)
 import Control.Monad.Trans (liftIO)
-import Control.Lens ((^.), _1, mapped, over)
+import Control.Lens ((^.))
 import Data.Aeson (eitherDecode)
-import Data.Array (elems)
 import Data.Data (Data)
 import Data.Generics (Typeable)
 import Github.Users (DetailedOwner, detailedOwnerEmail, detailedOwnerName, userInfoFor)
 import Network.Mail.Mime (Address(..), Mail, simpleMail)
 import Text.Hastache (defaultConfig, hastacheFile)
-import Text.Hastache.Context (mkStrContext, mkGenericContext)
-import Text.Regex.PCRE (MatchText, Regex, (=~), makeRegex)
+import Text.Hastache.Context (mkGenericContext)
+import Text.Regex.PCRE (Regex, makeRegex)
 import Text.Regex.Base.Extras (matchAllTextOnly)
 import Yesod.Core (Yesod)
 import Yesod.Core.Content (TypedContent)
@@ -34,8 +33,6 @@ import qualified Data.Text.Lazy        as TL
 import Email (sendEmail, sendErrorEmail)
 import GithubPayload
 import Data.Text.Encoding.Extras (bs2t, bsl2tl, t2bsl, t2tl)
-
-import Data.Text.Encoding (decodeUtf8)
 
 data SecondLook = SecondLook
 
@@ -61,7 +58,7 @@ data SecondLookEmail = SecondLookEmail
 
 -- \username
 githubUsernameRegex :: Regex
-githubUsernameRegex = makeRegex ("\\\\\\w+" :: BS.ByteString)
+githubUsernameRegex = makeRegex ("\\b\\\\\\w+\\b" :: BS.ByteString)
 
 -- \user@domain.com
 emailHandleRegex :: Regex
