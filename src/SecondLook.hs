@@ -20,7 +20,7 @@ import Text.Hastache (defaultConfig, hastacheFile)
 import Text.Hastache.Context (mkGenericContext)
 import Text.Regex.PCRE (Regex, makeRegex)
 import Text.Regex.Base.Extras (matchAllTextOnly)
-import Yesod.Core (Yesod)
+import Yesod.Core (Yesod, makeSessionBackend)
 import Yesod.Core.Content (TypedContent)
 import Yesod.Core.Dispatch (mkYesod, parseRoutes)
 import Yesod.Core.Handler (getRequest, invalidArgs, lookupPostParam, respond)
@@ -40,7 +40,8 @@ mkYesod "SecondLook" [parseRoutes|
     / RootR POST
 |]
 
-instance Yesod SecondLook
+instance Yesod SecondLook where
+    makeSessionBackend _ = return Nothing
 
 -- All of the information picked out of a payload and put into an email.
 -- CHANGES HERE MUST BE REFLECTED IN templates/!!! There is no compile-time assurance that the {{selectors}} are
