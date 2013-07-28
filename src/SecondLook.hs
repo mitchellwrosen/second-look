@@ -47,7 +47,8 @@ instance Yesod SecondLook where
 -- CHANGES HERE MUST BE REFLECTED IN templates/!!! There is no compile-time assurance that the {{selectors}} are
 -- matching anything.
 data SecondLookEmail = SecondLookEmail
-    { sleCommitAuthor    :: !T.Text
+    { sleCommitAdded     :: ![T.Text]
+    , sleCommitAuthor    :: !T.Text
     , sleCommitId        :: !T.Text
     , sleCommitMessage   :: !BS.ByteString -- ByteString because it's RegexLike and Text isn't.
     , sleCommitModified  :: ![T.Text]
@@ -144,7 +145,8 @@ sendSecondLookEmail repo commit =
         commit_author = commit ^. commitAuthor ^. userName
 
         second_look_email = SecondLookEmail
-            { sleCommitAuthor    = commit_author
+            { sleCommitAdded     = commit ^. commitAdded
+            , sleCommitAuthor    = commit_author
             , sleCommitId        = commit ^. commitId
             , sleCommitMessage   = commit ^. commitMessage
             , sleCommitModified  = commit ^. commitModified

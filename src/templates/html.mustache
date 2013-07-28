@@ -20,10 +20,18 @@
       <td>{{sleCommitMessage}}</td>
    </tr>
    <tr>
+      <th style="text-align: right">Added: </th>
+      <td>
+{{#sleCommitAdded}}
+         <span style="color: green;">{{.}} </span>
+{{/sleCommitAdded}}
+      </td>
+   </tr>
+   <tr>
       <th style="text-align: right">Modified: </th>
       <td>
 {{#sleCommitModified}}
-         <span style="color: green;">{{.}} </span>
+         <span style="color: yellow;">{{.}} </span>
 {{/sleCommitModified}}
       </td>
    </tr>
