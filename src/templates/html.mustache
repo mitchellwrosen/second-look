@@ -1,22 +1,84 @@
 <h2>Hi, {{sleUsername}}!</h2>
 
-<p><strong>{{sleCommitAuthor}}</strong> wants you to review a recent commit to <a
-href="{{repoUrl}}">{{repoName}}</a> on GitHub.</p>
+<p><strong>{{sleCommitAuthor}}</strong> wants you to review a recent commit to <a href="{{sleRepoUrl}}">{{sleRepoName}}</a> on GitHub.</p>
 
 <p>Review it: <a href="{{sleCommitUrl}}">{{sleCommitUrl}}</a></p>
+
+<hr>
 
 <h3>Commit Details</h3>
 <table>
    <tr>
-      <th style="text-align:right">Hash: </th>
+      <th style="text-align: right">Hash: </th>
       <td>{{sleCommitId}}</td>
    </tr>
    <tr>
-      <th style="text-align:right">Committed: </th>
+      <th style="text-align: right">Committed: </th>
       <td>{{sleCommitTimestamp}}</td>
    <tr>
       <th style="text-align:right">Message: </th>
       <td>{{sleCommitMessage}}</td>
    </tr>
+   <tr>
+      <th style="text-align: right">Modified: </th>
+      <td>
+{{#sleCommitModified}}
+         <span style="color: green;">{{.}} </span>
+{{/sleCommitModified}}
+      </td>
+   </tr>
+   <tr>
+      <th style="text-align: right">Removed: </th>
+      <td>
+{{#sleCommitRemoved}}
+         <span style="color: red; text-decoration: line-through;">{{.}} </span>
+{{/sleCommitRemoved}}
+      </td>
+   </tr>
+</table>
+
 <hr>
-<p style="font-size:10px;color:#ccc;font-style:italic">Sent by <a href="https://www.github.com/mitchellwrosen/second-look">Second Look</p>
+
+<h3>Repository Details</h3>
+<table>
+   <tr>
+      <th style="text-align: right">Name: </th>
+      <td>{{sleRepoName}}</td>
+   </tr>
+   <tr>
+      <th style="text-align: right">Url: </th>
+      <td>{{sleRepoUrl}}</td>
+   </tr>
+   <tr>
+      <th style="text-align: right">Description: </th>
+      <td>{{sleRepoDescription}}</td>
+   </tr>
+   <tr>
+      <th style="text-align: right">Created: </th>
+      <td>{{sleRepoCreatedAt}}</td>
+   </tr>
+   <tr>
+      <th style="text-align:right">Open issues: </th>
+      <td>{{sleRepoOpenIssues}}</td>
+   </tr>
+   <tr>
+      <th style="text-align:right">Size: </th>
+      <td>{{sleRepoSize}}</td>
+   </tr>
+   <tr>
+      <th style="text-align:right">Forks: </th>
+      <td>{{sleRepoForks}}</td>
+   </tr>
+   <tr>
+      <th style="text-align:right">Stargazers: </th>
+      <td>{{sleRepoStargazers}}</td>
+   </tr>
+   <tr>
+      <th style="text-align:right">Watchers: </th>
+      <td>{{sleRepoWatchers}}</td>
+   </tr>
+</table>
+
+<hr>
+
+<p style="font-size: 10px; font-style: italic;">Sent by <a href="https://www.github.com/mitchellwrosen/second-look">Second Look</a></p>

@@ -50,10 +50,19 @@ data SecondLookEmail = SecondLookEmail
     { sleCommitAuthor    :: !T.Text
     , sleCommitId        :: !T.Text
     , sleCommitMessage   :: !BS.ByteString -- ByteString because it's RegexLike and Text isn't.
+    , sleCommitModified  :: ![T.Text]
+    , sleCommitRemoved   :: ![T.Text]
     , sleCommitTimestamp :: !T.Text
     , sleCommitUrl       :: !T.Text
-    , sleRepoUrl         :: !T.Text
+    , sleRepoCreatedAt   :: !Integer
+    , sleRepoDescription :: !T.Text
+    , sleRepoForks       :: !Integer
     , sleRepoName        :: !T.Text
+    , sleRepoOpenIssues  :: !Integer
+    , sleRepoSize        :: !Integer
+    , sleRepoStargazers  :: !Integer
+    , sleRepoWatchers    :: !Integer
+    , sleRepoUrl         :: !T.Text
     , sleUsername        :: !T.Text
     } deriving (Data, Typeable)
 
@@ -138,10 +147,19 @@ sendSecondLookEmail repo commit =
             { sleCommitAuthor    = commit_author
             , sleCommitId        = commit ^. commitId
             , sleCommitMessage   = commit ^. commitMessage
+            , sleCommitModified  = commit ^. commitModified
+            , sleCommitRemoved   = commit ^. commitRemoved
             , sleCommitTimestamp = commit ^. commitTimestamp
             , sleCommitUrl       = commit ^. commitUrl
-            , sleRepoUrl         = repo   ^. repoUrl
+            , sleRepoCreatedAt   = repo   ^. repoCreatedAt
+            , sleRepoDescription = repo   ^. repoDescription
+            , sleRepoForks       = repo   ^. repoForks
+            , sleRepoOpenIssues  = repo   ^. repoOpenIssues
+            , sleRepoSize        = repo   ^. repoSize
+            , sleRepoStargazers  = repo   ^. repoStargazers
+            , sleRepoWatchers    = repo   ^. repoWatchers
             , sleRepoName        = repo   ^. repoName
+            , sleRepoUrl         = repo   ^. repoUrl
             , sleUsername        = recipient_handle
             }
 
