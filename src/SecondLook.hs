@@ -10,7 +10,6 @@ module SecondLook where
 import Control.Applicative ((<$>))
 import Control.Monad.Extras (mapMaybeM)
 import Control.Monad.Trans (liftIO)
-import Control.Lens ((^.))
 import Data.Aeson (eitherDecode)
 import Data.Data (Data)
 import Data.Generics (Typeable)
@@ -110,8 +109,8 @@ decodePayload payload_json =
 payloadToEmails :: GHPayload -> IO [SecondLookEmail]
 payloadToEmails payload = concat <$> mapM (makeEmails repo) commits
   where
-    commits = payload ^. payloadCommits     -- :: [GHCommit]
-    repo    = payload ^. payloadRepository  -- :: GHRepository
+    commits = payloadCommits    payload  -- :: [GHCommit]
+    repo    = payloadRepository payload  -- :: GHRepository
 
 makeEmails :: GHRepository -> GHCommit -> IO [SecondLookEmail]
 makeEmails repo commit = do
@@ -120,7 +119,7 @@ makeEmails repo commit = do
     let email_addr_emails = makeEmailsToEmailAddrs repo commit email_addrs
     return $ github_emails ++ email_addr_emails
   where
-    commit_message = commit ^. commitMessage
+    commit_message = commitMessage commit
     usernames      = T.drop 1 . bs2t <$> matchAllTextOnly githubUsernameRegex commit_message
     email_addrs    = T.drop 1 . bs2t <$> matchAllTextOnly emailHandleRegex    commit_message
 
@@ -146,23 +145,23 @@ makeEmailToEmailAddr repo commit email_addr = makeSecondLookEmail repo commit em
 
 makeSecondLookEmail :: GHRepository -> GHCommit -> Text -> Maybe Text -> Text -> SecondLookEmail
 makeSecondLookEmail repo commit salutation full_name email_addr = SecondLookEmail
-    { sleCommitAdded     = commit ^. commitAdded
-    , sleCommitAuthor    = commit ^. commitAuthor ^. userName
-    , sleCommitId        = commit ^. commitId
-    , sleCommitMessage   = commit ^. commitMessage
-    , sleCommitModified  = commit ^. commitModified
-    , sleCommitRemoved   = commit ^. commitRemoved
-    , sleCommitTimestamp = commit ^. commitTimestamp
-    , sleCommitUrl       = commit ^. commitUrl
-    , sleRepoCreatedAt   = repo   ^. repoCreatedAt
-    , sleRepoDescription = repo   ^. repoDescription
-    , sleRepoForks       = repo   ^. repoForks
-    , sleRepoOpenIssues  = repo   ^. repoOpenIssues
-    , sleRepoSize        = repo   ^. repoSize
-    , sleRepoStargazers  = repo   ^. repoStargazers
-    , sleRepoWatchers    = repo   ^. repoWatchers
-    , sleRepoName        = repo   ^. repoName
-    , sleRepoUrl         = repo   ^. repoUrl
+    { sleCommitAdded     = commitAdded     commit
+    , sleCommitAuthor    = userName      $ commitAuthor commit
+    , sleCommitId        = commitId        commit
+    , sleCommitMessage   = commitMessage   commit
+    , sleCommitModified  = commitModified  commit
+    , sleCommitRemoved   = commitRemoved   commit
+    , sleCommitTimestamp = commitTimestamp commit
+    , sleCommitUrl       = commitUrl       commit
+    , sleRepoCreatedAt   = repoCreatedAt   repo
+    , sleRepoDescription = repoDescription repo
+    , sleRepoForks       = repoForks       repo
+    , sleRepoOpenIssues  = repoOpenIssues  repo
+    , sleRepoSize        = repoSize        repo
+    , sleRepoStargazers  = repoStargazers  repo
+    , sleRepoWatchers    = repoWatchers    repo
+    , sleRepoName        = repoName        repo
+    , sleRepoUrl         = repoUrl         repo
     , sleSalutation      = salutation
     , sleFullName        = full_name
     , sleEmailAddr       = email_addr

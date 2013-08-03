@@ -3,7 +3,6 @@
 module GithubPayload where
 
 import Control.Applicative ((<$>), (<*>))
-import Control.Lens (makeLenses)
 import Control.Monad (mzero)
 import Data.Aeson
     ( FromJSON
@@ -14,62 +13,58 @@ import Data.ByteString (ByteString)
 import Data.Text (Text)
 
 data GHUser = GHUser
-    { _userName     :: !Text
-    , _userEmail    :: Maybe Text
-    , _userUsername :: Maybe Text
+    { userName     :: !Text
+    , userEmail    :: Maybe Text
+    , userUsername :: Maybe Text
     } deriving (Show)
-makeLenses ''GHUser
 
 data GHCommit = GHCommit
-    { _commitAdded     :: [Text]
-    , _commitAuthor    :: GHUser
-    , _commitCommitter :: GHUser
-    , _commitDistinct  :: Bool
-    , _commitId        :: Text
-    , _commitMessage   :: ByteString -- Not Text, because ByteString is RegexLike
-    , _commitModified  :: [Text]
-    , _commitRemoved   :: [Text]
-    , _commitTimestamp :: Text
-    , _commitUrl       :: Text
+    { commitAdded     :: [Text]
+    , commitAuthor    :: GHUser
+    , commitCommitter :: GHUser
+    , commitDistinct  :: Bool
+    , commitId        :: Text
+    , commitMessage   :: ByteString -- Not Text, because ByteString is RegexLike
+    , commitModified  :: [Text]
+    , commitRemoved   :: [Text]
+    , commitTimestamp :: Text
+    , commitUrl       :: Text
     } deriving (Show)
-makeLenses ''GHCommit
 
 data GHRepository = GHRepository
-    { _repoCreatedAt    :: Integer
-    , _repoDescription  :: Text
-    , _repoFork         :: Bool
-    , _repoForks        :: Integer
-    , _repoHasDownloads :: Bool
-    , _repoHasIssues    :: Bool
-    , _repoHasWiki      :: Bool
-    , _repoId           :: Integer
-    , _repoMasterBranch :: Text
-    , _repoName         :: Text
-    , _repoOpenIssues   :: Integer
-    , _repoOwner        :: GHUser
-    , _repoPrivate      :: Bool
-    , _repoPushedAt     :: Integer
-    , _repoSize         :: Integer
-    , _repoStargazers   :: Integer
-    , _repoUrl          :: Text
-    , _repoWatchers     :: Integer
+    { repoCreatedAt    :: Integer
+    , repoDescription  :: Text
+    , repoFork         :: Bool
+    , repoForks        :: Integer
+    , repoHasDownloads :: Bool
+    , repoHasIssues    :: Bool
+    , repoHasWiki      :: Bool
+    , repoId           :: Integer
+    , repoMasterBranch :: Text
+    , repoName         :: Text
+    , repoOpenIssues   :: Integer
+    , repoOwner        :: GHUser
+    , repoPrivate      :: Bool
+    , repoPushedAt     :: Integer
+    , repoSize         :: Integer
+    , repoStargazers   :: Integer
+    , repoUrl          :: Text
+    , repoWatchers     :: Integer
     } deriving (Show)
-makeLenses ''GHRepository
 
 data GHPayload = GHPayload
-    { _payloadAfter      :: Text
-    , _payloadBefore     :: Text
-    , _payloadCommits    :: [GHCommit]
-    , _payloadCompare    :: Text
-    , _payloadCreated    :: Bool
-    , _payloadDeleted    :: Bool
-    , _payloadForced     :: Bool
-    , _payloadHeadCommit :: GHCommit
-    , _payloadPusher     :: GHUser
-    , _payloadRef        :: Text
-    , _payloadRepository :: GHRepository
+    { payloadAfter      :: Text
+    , payloadBefore     :: Text
+    , payloadCommits    :: [GHCommit]
+    , payloadCompare    :: Text
+    , payloadCreated    :: Bool
+    , payloadDeleted    :: Bool
+    , payloadForced     :: Bool
+    , payloadHeadCommit :: GHCommit
+    , payloadPusher     :: GHUser
+    , payloadRef        :: Text
+    , payloadRepository :: GHRepository
     } deriving (Show)
-makeLenses ''GHPayload
 
 --------------------------------------------------------------------------------
 
