@@ -8,12 +8,13 @@
 module SecondLook where
 
 import Control.Applicative ((<$>))
-import Control.Monad (forM_)
+import Control.Monad.Extras (mapMaybeM)
 import Control.Monad.Trans (liftIO)
 import Control.Lens ((^.))
 import Data.Aeson (eitherDecode)
 import Data.Data (Data)
 import Data.Generics (Typeable)
+import Data.Text (Text)
 import Github.Users (DetailedOwner, detailedOwnerEmail, detailedOwnerName, userInfoFor)
 import Network.Mail.Mime (Address(..), Mail, simpleMail)
 import Text.Hastache (defaultConfig, hastacheFile)
@@ -34,6 +35,9 @@ import Email (sendEmail, sendErrorEmail)
 import GithubPayload
 import Data.Text.Encoding.Extras (bs2t, bsl2tl, t2bsl, t2tl)
 
+type GitHubUsername = Text
+type EmailAddress   = Text
+
 data SecondLook = SecondLook
 
 mkYesod "SecondLook" [parseRoutes|
@@ -47,25 +51,27 @@ instance Yesod SecondLook where
 -- CHANGES HERE MUST BE REFLECTED IN templates/!!! There is no compile-time assurance that the {{selectors}} are
 -- matching anything.
 data SecondLookEmail = SecondLookEmail
-    { sleCommitAdded     :: ![T.Text]
-    , sleCommitAuthor    :: !T.Text
-    , sleCommitId        :: !T.Text
+    { sleCommitAdded     :: ![Text]
+    , sleCommitAuthor    :: !Text
+    , sleCommitId        :: !Text
     , sleCommitMessage   :: !BS.ByteString -- ByteString because it's RegexLike and Text isn't.
-    , sleCommitModified  :: ![T.Text]
-    , sleCommitRemoved   :: ![T.Text]
-    , sleCommitTimestamp :: !T.Text
-    , sleCommitUrl       :: !T.Text
+    , sleCommitModified  :: ![Text]
+    , sleCommitRemoved   :: ![Text]
+    , sleCommitTimestamp :: !Text
+    , sleCommitUrl       :: !Text
     , sleRepoCreatedAt   :: !Integer
-    , sleRepoDescription :: !T.Text
+    , sleRepoDescription :: !Text
     , sleRepoForks       :: !Integer
-    , sleRepoName        :: !T.Text
+    , sleRepoName        :: !Text
     , sleRepoOpenIssues  :: !Integer
     , sleRepoSize        :: !Integer
     , sleRepoStargazers  :: !Integer
     , sleRepoWatchers    :: !Integer
-    , sleRepoUrl         :: !T.Text
-    , sleUsername        :: !T.Text
-    } deriving (Data, Typeable)
+    , sleRepoUrl         :: !Text
+    , sleSalutation      :: !Text
+    , sleFullName        :: !(Maybe Text)
+    , sleEmailAddr       :: !Text
+    } deriving (Data, Show, Typeable)
 
 -- \username
 githubUsernameRegex :: Regex
@@ -80,98 +86,104 @@ postRootR =
     getRequest >>= \_ -> -- TODO: Send (show request) in error email.
     lookupPostParam "payload" >>=
     \case
-        Just push ->
-            handlePayload push >>
-            respond "text/plain" ("ok" :: T.Text)
+        Just payload ->
+            handlePayload payload >>
+            respond "text/plain" ("ok" :: Text)
         Nothing ->
             liftIO (sendErrorEmail ["Bad Request"]) >>
             invalidArgs ["Expected parameter 'payload'"]
 
-handlePayload :: T.Text -> Handler ()
-handlePayload push_json =
-    decodePayload >>=
+handlePayload :: Text -> Handler ()
+handlePayload payload =
+    decodePayload payload >>=
+    liftIO . payloadToEmails >>=
     liftIO . sendSecondLookEmails
+
+decodePayload :: Text -> Handler GHPayload
+decodePayload payload_json =
+    case eitherDecode $ t2bsl payload_json of
+        Right payload -> return payload
+        Left  err     -> do
+            liftIO $ sendErrorEmail [TL.pack err, t2tl payload_json]
+            invalidArgs [payload_json]
+
+payloadToEmails :: GHPayload -> IO [SecondLookEmail]
+payloadToEmails payload = concat <$> mapM (makeEmails repo) commits
   where
-    decodePayload :: Handler Payload
-    decodePayload =
-        case eitherDecode (t2bsl push_json) of
-            Right payload -> return payload
-            Left  err     ->
-                liftIO (sendErrorEmail [TL.pack err, t2tl push_json]) >>
-                invalidArgs [push_json]
+    commits = payload ^. payloadCommits     -- :: [GHCommit]
+    repo    = payload ^. payloadRepository  -- :: GHRepository
 
-sendSecondLookEmails :: Payload -> IO ()
-sendSecondLookEmails payload = do
-    let repo    = payload ^. payloadRepository
-        commits = payload ^. payloadCommits
-    mapM_ (sendSecondLookEmail repo) commits
-
-sendSecondLookEmail :: PayloadRepository -> PayloadCommit   -> IO ()
-sendSecondLookEmail repo commit =
-    maybeSendEmailToGitHubUsername >>
-    maybeSendEmailToEmailHandle
+makeEmails :: GHRepository -> GHCommit -> IO [SecondLookEmail]
+makeEmails repo commit = do
+    -- Unfortunate asymmetry: github emails require IO, regular emails don't
+    github_emails <- makeEmailsToGitHubUsernames repo commit usernames
+    let email_addr_emails = makeEmailsToEmailAddrs repo commit email_addrs
+    return $ github_emails ++ email_addr_emails
   where
-    maybeSendEmailToGitHubUsername :: IO ()
-    maybeSendEmailToGitHubUsername =
-        let
-            commit_message   = commit ^. commitMessage
-            github_usernames = T.drop 1 . bs2t <$> matchAllTextOnly githubUsernameRegex commit_message
-        in
-            forM_ github_usernames $ \github_username ->
-                userInfoFor (T.unpack github_username) >>=
-                \case
-                    Right github_user_info -> sendEmailToGitHubUser github_username github_user_info
-                    Left _ -> return () -- Matched \junk, just ignore
+    commit_message = commit ^. commitMessage
+    usernames      = T.drop 1 . bs2t <$> matchAllTextOnly githubUsernameRegex commit_message
+    email_addrs    = T.drop 1 . bs2t <$> matchAllTextOnly emailHandleRegex    commit_message
 
-    sendEmailToGitHubUser :: T.Text -> DetailedOwner -> IO ()
-    sendEmailToGitHubUser github_username github_user_info = do
-        let full_name  = T.pack <$> detailedOwnerName  github_user_info
-            email_addr = T.pack  $  detailedOwnerEmail github_user_info
-        doSendEmail github_username full_name email_addr
+makeEmailsToGitHubUsernames :: GHRepository -> GHCommit -> [GitHubUsername] -> IO [SecondLookEmail]
+makeEmailsToGitHubUsernames repo commit =
+    mapMaybeM (makeEmailToGitHubUsername repo commit)
 
-    maybeSendEmailToEmailHandle :: IO ()
-    maybeSendEmailToEmailHandle = do
-        let commit_message = commit ^. commitMessage
-            email_addrs    = T.drop 1 . bs2t <$> matchAllTextOnly emailHandleRegex commit_message
-        forM_ email_addrs $ \email_addr ->
-            doSendEmail email_addr (Just email_addr) email_addr
+makeEmailToGitHubUsername :: GHRepository -> GHCommit -> GitHubUsername -> IO (Maybe SecondLookEmail)
+makeEmailToGitHubUsername repo commit username =
+    userInfoFor (T.unpack username) >>=
+    \case
+        Left  _         -> return Nothing -- Matched \junk, just ignore
+        Right user_info -> return $ Just $ makeSecondLookEmail repo commit username full_name email_addr
+          where
+            full_name  = T.pack <$> detailedOwnerName  user_info
+            email_addr = T.pack  $  detailedOwnerEmail user_info
 
-    doSendEmail :: T.Text -> Maybe T.Text -> T.Text -> IO ()
-    doSendEmail recipient_handle recipient_full_name recipient_email = do
-        plain_body <- readTemplate "templates/plain.mustache" second_look_email
-        html_body  <- readTemplate "templates/html.mustache" second_look_email
-        createEmail plain_body html_body >>= sendEmail
+makeEmailsToEmailAddrs :: GHRepository -> GHCommit -> [EmailAddress] -> [SecondLookEmail]
+makeEmailsToEmailAddrs repo commit = map (makeEmailToEmailAddr repo commit)
+
+makeEmailToEmailAddr :: GHRepository -> GHCommit -> EmailAddress -> SecondLookEmail
+makeEmailToEmailAddr repo commit email_addr = makeSecondLookEmail repo commit email_addr Nothing email_addr
+
+makeSecondLookEmail :: GHRepository -> GHCommit -> Text -> Maybe Text -> Text -> SecondLookEmail
+makeSecondLookEmail repo commit salutation full_name email_addr = SecondLookEmail
+    { sleCommitAdded     = commit ^. commitAdded
+    , sleCommitAuthor    = commit ^. commitAuthor ^. userName
+    , sleCommitId        = commit ^. commitId
+    , sleCommitMessage   = commit ^. commitMessage
+    , sleCommitModified  = commit ^. commitModified
+    , sleCommitRemoved   = commit ^. commitRemoved
+    , sleCommitTimestamp = commit ^. commitTimestamp
+    , sleCommitUrl       = commit ^. commitUrl
+    , sleRepoCreatedAt   = repo   ^. repoCreatedAt
+    , sleRepoDescription = repo   ^. repoDescription
+    , sleRepoForks       = repo   ^. repoForks
+    , sleRepoOpenIssues  = repo   ^. repoOpenIssues
+    , sleRepoSize        = repo   ^. repoSize
+    , sleRepoStargazers  = repo   ^. repoStargazers
+    , sleRepoWatchers    = repo   ^. repoWatchers
+    , sleRepoName        = repo   ^. repoName
+    , sleRepoUrl         = repo   ^. repoUrl
+    , sleSalutation      = salutation
+    , sleFullName        = full_name
+    , sleEmailAddr       = email_addr
+    }
+
+sendSecondLookEmails :: [SecondLookEmail] -> IO ()
+sendSecondLookEmails = mapM_ sendSecondLookEmail
+
+sendSecondLookEmail :: SecondLookEmail -> IO ()
+sendSecondLookEmail second_look_email = do
+    plain_body <- readTemplate "templates/plain.mustache" second_look_email
+    html_body  <- readTemplate "templates/html.mustache"  second_look_email
+    createEmail plain_body html_body >>= sendEmail
       where
-        commit_author = commit ^. commitAuthor ^. userName
-
-        second_look_email = SecondLookEmail
-            { sleCommitAdded     = commit ^. commitAdded
-            , sleCommitAuthor    = commit_author
-            , sleCommitId        = commit ^. commitId
-            , sleCommitMessage   = commit ^. commitMessage
-            , sleCommitModified  = commit ^. commitModified
-            , sleCommitRemoved   = commit ^. commitRemoved
-            , sleCommitTimestamp = commit ^. commitTimestamp
-            , sleCommitUrl       = commit ^. commitUrl
-            , sleRepoCreatedAt   = repo   ^. repoCreatedAt
-            , sleRepoDescription = repo   ^. repoDescription
-            , sleRepoForks       = repo   ^. repoForks
-            , sleRepoOpenIssues  = repo   ^. repoOpenIssues
-            , sleRepoSize        = repo   ^. repoSize
-            , sleRepoStargazers  = repo   ^. repoStargazers
-            , sleRepoWatchers    = repo   ^. repoWatchers
-            , sleRepoName        = repo   ^. repoName
-            , sleRepoUrl         = repo   ^. repoUrl
-            , sleUsername        = recipient_handle
-            }
-
         createEmail :: TL.Text -> TL.Text -> IO Mail
         createEmail plain_body html_body =
             simpleMail to from subject plain_body html_body attachments
 
-        to          = Address recipient_full_name recipient_email
+        to          = Address (sleFullName second_look_email) (sleEmailAddr second_look_email)
         from        = Address (Just "Second Look") "mitchellwrosen@gmail.com"
-        subject     = commit_author `T.append` " is requesting code review"
+        subject     = (sleCommitAuthor second_look_email) `T.append` " is requesting code review"
         attachments = []
 
 readTemplate :: String -> SecondLookEmail -> IO TL.Text

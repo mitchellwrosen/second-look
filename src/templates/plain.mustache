@@ -1,6 +1,6 @@
-Hi {{sleUsername}}!
+Hi {{sleSalutation}}!
 
-{{sleCommitAuthor}} wants you to review a recent commit to {{sleRepoName}} ({{sleRepoUrl}}) on GitHub.
+{{sleCommitAuthor}} wants you to review a recent commit to "{{sleRepoName}}" ({{sleRepoUrl}}) on GitHub.
 
 Review it: {{sleCommitUrl}}
 
@@ -9,5 +9,21 @@ Commit Details
      Hash: {{sleCommitId}}
 Committed: {{sleCommitTimestamp}}
   Message: {{sleCommitMessage}}
+    Added: {{#sleCommitAdded}}{{.}} {{/sleCommitAdded}}
+ Modified: {{#sleCommitModified}}{{.}} {{/sleCommitModified}}
+  Removed: {{sleCommitRemoved}}{{.}} {{/sleCommitRemoved}}
 
-Sent by Second Look ("https://www.github.com/mitchellwrosen/second-look")
+Repository Details
+==================
+       Name: {{sleRepoName}}
+        URL: {{sleRepoUrl}}
+Description: {{sleRepoDescription}}
+    Created: {{sleRepoCreatedAt}}
+Open issues: {{sleRepoOpenIssues}}
+       Size: {{sleRepoSize}} kb
+      Forks: {{sleRepoForks}}
+ Stargazers: {{sleRepoStargazers}}
+   Watchers: {{sleRepoWatchers}}
+
+-----
+Sent by Second Look

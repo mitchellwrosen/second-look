@@ -1,4 +1,4 @@
-<h2>Hi, {{sleUsername}}!</h2>
+<h2>Hi, {{sleSalutation}}!</h2>
 
 <p><strong>{{sleCommitAuthor}}</strong> wants you to review a recent commit to <a href="{{sleRepoUrl}}">{{sleRepoName}}</a> on GitHub.</p>
 
@@ -31,7 +31,7 @@
       <th style="text-align: right">Modified: </th>
       <td>
 {{#sleCommitModified}}
-         <span style="color: yellow;">{{.}} </span>
+         <span style="color: blue;">{{.}} </span>
 {{/sleCommitModified}}
       </td>
    </tr>
@@ -71,7 +71,7 @@
    </tr>
    <tr>
       <th style="text-align:right">Size: </th>
-      <td>{{sleRepoSize}}</td>
+      <td>{{sleRepoSize}} kb</td>
    </tr>
    <tr>
       <th style="text-align:right">Forks: </th>

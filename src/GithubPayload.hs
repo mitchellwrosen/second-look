@@ -13,17 +13,17 @@ import Data.Aeson
 import Data.ByteString (ByteString)
 import Data.Text (Text)
 
-data PayloadUser = PayloadUser
-    { _userName     :: Text
+data GHUser = GHUser
+    { _userName     :: !Text
     , _userEmail    :: Maybe Text
     , _userUsername :: Maybe Text
     } deriving (Show)
-makeLenses ''PayloadUser
+makeLenses ''GHUser
 
-data PayloadCommit = PayloadCommit
+data GHCommit = GHCommit
     { _commitAdded     :: [Text]
-    , _commitAuthor    :: PayloadUser
-    , _commitCommitter :: PayloadUser
+    , _commitAuthor    :: GHUser
+    , _commitCommitter :: GHUser
     , _commitDistinct  :: Bool
     , _commitId        :: Text
     , _commitMessage   :: ByteString -- Not Text, because ByteString is RegexLike
@@ -32,9 +32,9 @@ data PayloadCommit = PayloadCommit
     , _commitTimestamp :: Text
     , _commitUrl       :: Text
     } deriving (Show)
-makeLenses ''PayloadCommit
+makeLenses ''GHCommit
 
-data PayloadRepository = PayloadRepository
+data GHRepository = GHRepository
     { _repoCreatedAt    :: Integer
     , _repoDescription  :: Text
     , _repoFork         :: Bool
@@ -46,7 +46,7 @@ data PayloadRepository = PayloadRepository
     , _repoMasterBranch :: Text
     , _repoName         :: Text
     , _repoOpenIssues   :: Integer
-    , _repoOwner        :: PayloadUser
+    , _repoOwner        :: GHUser
     , _repoPrivate      :: Bool
     , _repoPushedAt     :: Integer
     , _repoSize         :: Integer
@@ -54,36 +54,36 @@ data PayloadRepository = PayloadRepository
     , _repoUrl          :: Text
     , _repoWatchers     :: Integer
     } deriving (Show)
-makeLenses ''PayloadRepository
+makeLenses ''GHRepository
 
-data Payload = Payload
+data GHPayload = GHPayload
     { _payloadAfter      :: Text
     , _payloadBefore     :: Text
-    , _payloadCommits    :: [PayloadCommit]
+    , _payloadCommits    :: [GHCommit]
     , _payloadCompare    :: Text
     , _payloadCreated    :: Bool
     , _payloadDeleted    :: Bool
     , _payloadForced     :: Bool
-    , _payloadHeadCommit :: PayloadCommit
-    , _payloadPusher     :: PayloadUser
+    , _payloadHeadCommit :: GHCommit
+    , _payloadPusher     :: GHUser
     , _payloadRef        :: Text
-    , _payloadRepository :: PayloadRepository
+    , _payloadRepository :: GHRepository
     } deriving (Show)
-makeLenses ''Payload
+makeLenses ''GHPayload
 
 --------------------------------------------------------------------------------
 
-instance FromJSON PayloadUser where
+instance FromJSON GHUser where
     parseJSON (Object o) =
-        PayloadUser      <$>
+        GHUser           <$>
         o .:  "name"     <*>
         o .:? "email"    <*>
         o .:? "username"
     parseJSON _ = mzero
 
-instance FromJSON PayloadCommit where
+instance FromJSON GHCommit where
     parseJSON (Object o) =
-        PayloadCommit    <$>
+        GHCommit         <$>
         o .: "added"     <*>
         o .: "author"    <*>
         o .: "committer" <*>
@@ -96,9 +96,9 @@ instance FromJSON PayloadCommit where
         o .: "url"
     parseJSON _ = mzero
 
-instance FromJSON PayloadRepository where
+instance FromJSON GHRepository where
     parseJSON (Object o) =
-        PayloadRepository    <$>
+        GHRepository         <$>
         o .: "created_at"    <*>
         o .: "description"   <*>
         o .: "fork"          <*>
@@ -119,9 +119,9 @@ instance FromJSON PayloadRepository where
         o .: "watchers"
     parseJSON _ = mzero
 
-instance FromJSON Payload where
+instance FromJSON GHPayload where
     parseJSON (Object o) =
-        Payload            <$>
+        GHPayload          <$>
         o .: "after"       <*>
         o .: "before"      <*>
         o .: "commits"     <*>
